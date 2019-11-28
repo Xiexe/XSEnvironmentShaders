@@ -20,6 +20,11 @@ Shader "Xiexe/Environment/Opaque"
         _Glossiness("Smoothness", Range(0,1)) = 0
 
         [Space(16)]
+        [Header(OCCLUSION)]
+        _OcclusionMap("Occlusion Map", 2D) = "white" {}
+        _OcclusionStrength("Occlusion Strength", Float) = 1
+
+        [Space(16)]
         [Header(EMISSION)]
         _EmissionMap("Emission Map", 2D) = "white" {}
         [HDR]_EmissionColor("Emission Color", Color) = (0,0,0,1)
@@ -44,6 +49,7 @@ Shader "Xiexe/Environment/Opaque"
 			#pragma vertex vert
 			#pragma fragment frag
             #pragma multi_compile_fwdbase 
+            #pragma multi_compile_fog
 
             #ifndef UNITY_PASS_FORWARDBASE
                 #define UNITY_PASS_FORWARDBASE
@@ -74,6 +80,7 @@ Shader "Xiexe/Environment/Opaque"
                 float3 objPos : TEXCOORD7;
                 float3 objNormal : TEXCOORD8;
                 SHADOW_COORDS(9)
+                UNITY_FOG_COORDS(10)
 			};
 
             #include "Defines.cginc"
@@ -93,6 +100,7 @@ Shader "Xiexe/Environment/Opaque"
 			#pragma vertex vert
 			#pragma fragment frag
             #pragma multi_compile_fwdadd_fullshadows
+            #pragma multi_compile_fog
             
             #ifndef UNITY_PASS_FORWARDADD
                 #define UNITY_PASS_FORWARDADD
@@ -113,12 +121,13 @@ Shader "Xiexe/Environment/Opaque"
 			struct v2f
 			{
                 float4 pos : SV_POSITION;
-				float2 uv : TEXCOORD0;
-                float3 btn[3] : TEXCOORD1; //TEXCOORD2, TEXCOORD3 | bitangent, tangent, worldNormal
+				centroid float2 uv : TEXCOORD0;
+                centroid float3 btn[3] : TEXCOORD1; //TEXCOORD2, TEXCOORD3 | bitangent, tangent, worldNormal
                 float3 worldPos : TEXCOORD4;
                 float3 objPos : TEXCOORD5;
                 float3 objNormal : TEXCOORD6;
                 SHADOW_COORDS(7)
+                UNITY_FOG_COORDS(8)
 			};
 
             #include "Defines.cginc"

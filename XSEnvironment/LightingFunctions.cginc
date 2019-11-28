@@ -1,11 +1,18 @@
 ﻿//This file contains all of the neccisary functions for lighting to work a'la standard shading.
 //Feel free to add to this.
 
-half4 getMetallicSmoothness(float4 metallicGlossMap)
+half4 getMetallicSmoothness(float4 metallicGlossMap, float3 worldNormal)
 {
 	half roughness = 1-(_Glossiness * metallicGlossMap.a);
 	roughness *= 1.7 - 0.7 * roughness;
 	half metallic = metallicGlossMap.r * _Metallic;
+
+    //GeometricSpecularAA
+    // float3 vNormalWsDdx = ddx( worldNormal );
+    // float3 vNormalWsDdy = ddy( worldNormal );
+    // float flGeometricRoughnessFactor = (pow( saturate( max( dot( vNormalWsDdx, vNormalWsDdx ), dot( vNormalWsDdy, vNormalWsDdy ) ) ), 0.333 ));
+    // roughness = roughness * (1-flGeometricRoughnessFactor);
+
 	return half4(metallic, 0, 0, roughness);
 }
 
@@ -139,19 +146,25 @@ float4 texTP( sampler2D tex, float4 tillingOffset, float3 worldPos, float3 objPo
         
         worldPos = lerp(worldPos, objPos, _TextureSampleMode - 1);
         worldNormal = lerp(worldNormal, objNormal, _TextureSampleMode - 1);
-        
+
         float3 projNormal = pow(abs(worldNormal),falloff);
         projNormal /= projNormal.x + projNormal.y + projNormal.z;
         float3 nsign = sign(worldNormal);
-        half4 xNorm; half4 yNorm; half4 zNorm;
-        xNorm = tex2D( tex, tillingOffset.xy * worldPos.zy * float2( nsign.x, 1.0 ) + tillingOffset.zw);
-        yNorm = tex2D( tex, tillingOffset.xy * worldPos.xz * float2( nsign.y, 1.0 ) + tillingOffset.zw);
-        zNorm = tex2D( tex, tillingOffset.xy * worldPos.xy * float2( -nsign.z, 1.0 ) + tillingOffset.zw);
+        half4 xNorm = half4(0,0,0,0); half4 yNorm = half4(0,0,0,0); half4 zNorm = half4(0,0,0,0);
+
+        if(projNormal.x > 0)
+            xNorm = tex2D( tex, tillingOffset.xy * worldPos.zy * float2( nsign.x, 1.0 ) + tillingOffset.zw);
+
+        if(projNormal.y > 0)
+            yNorm = tex2D( tex, tillingOffset.xy * worldPos.xz * float2( nsign.y, 1.0 ) + tillingOffset.zw);
+
+        if(projNormal.z > 0)
+            zNorm = tex2D( tex, tillingOffset.xy * worldPos.xy * float2( -nsign.z, 1.0 ) + tillingOffset.zw);
 
         return xNorm * projNormal.x + yNorm * projNormal.y + zNorm * projNormal.z;
     }
     else{
-        return tex2D(tex, uv);
+        return tex2D(tex, uv * tillingOffset.xy + tillingOffset.zw);
     } 
 }
 //same as above but for normal maps
@@ -165,10 +178,16 @@ float3 texTPNorm( sampler2D tex, float4 tillingOffset, float3 worldPos, float3 o
         float3 projNormal = pow(abs(worldNormal), falloff);
         projNormal /= projNormal.x + projNormal.y + projNormal.z;
         float3 nsign = sign(worldNormal);
-        half4 xNorm; half4 yNorm; half4 zNorm;
-        xNorm = tex2D( tex, tillingOffset.xy * worldPos.zy * float2( nsign.x, 1.0 ) + tillingOffset.zw);
-        yNorm = tex2D( tex, tillingOffset.xy * worldPos.xz * float2( nsign.y, 1.0 ) + tillingOffset.zw);
-        zNorm = tex2D( tex, tillingOffset.xy * worldPos.xy * float2( -nsign.z, 1.0 ) + tillingOffset.zw);
+        half4 xNorm = half4(0,0,0,0); half4 yNorm = half4(0,0,0,0); half4 zNorm = half4(0,0,0,0);
+        
+        if(projNormal.x > 0)
+            xNorm = tex2D( tex, tillingOffset.xy * worldPos.zy * float2( nsign.x, 1.0 ) + tillingOffset.zw);
+
+        if(projNormal.y > 0)
+            yNorm = tex2D( tex, tillingOffset.xy * worldPos.xz * float2( nsign.y, 1.0 ) + tillingOffset.zw);
+
+        if(projNormal.z > 0)
+            zNorm = tex2D( tex, tillingOffset.xy * worldPos.xy * float2( -nsign.z, 1.0 ) + tillingOffset.zw);
 
         xNorm.xyz = UnpackNormal(xNorm);
         yNorm.xyz = UnpackNormal(yNorm);
@@ -177,6 +196,6 @@ float3 texTPNorm( sampler2D tex, float4 tillingOffset, float3 worldPos, float3 o
         return (xNorm.xyz * projNormal.x + yNorm.xyz * projNormal.y + zNorm.xyz * projNormal.z);
     }
     else{
-        return UnpackNormal(tex2D(tex, uv));
+        return UnpackNormal(tex2D(tex, uv * tillingOffset.xy + tillingOffset.zw));
     }
 }

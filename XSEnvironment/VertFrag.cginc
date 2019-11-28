@@ -23,6 +23,7 @@ v2f vert (appdata v)
         o.objPos = v.vertex;
         o.objNormal = v.normal;
         UNITY_TRANSFER_SHADOW(o, o.uv);
+        UNITY_TRANSFER_FOG(o,o.pos);
     #else
     TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
     #endif
@@ -53,11 +54,14 @@ fixed4 frag (v2f i) : SV_Target
 
         //METALLIC SMOOTHNESS
         float4 metallicGlossMap = texTP(_MetallicGlossMap, _MetallicGlossMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv);
-        float4 metallicSmoothness = getMetallicSmoothness(metallicGlossMap);
+        float4 metallicSmoothness = getMetallicSmoothness(metallicGlossMap, i.btn[2]);
 
         //EMISSION
         float4 emissionMap = texTP(_EmissionMap, _EmissionMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv);
         float4 emission = emissionMap * _EmissionColor;
+
+        //OCCLUSION
+        float4 occlusionMap = texTP(_OcclusionMap, _OcclusionMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv);
 
         //DIFFUSE
         fixed4 diffuse = texTP(_MainTex, _MainTex_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv) * _Color;
@@ -93,6 +97,9 @@ fixed4 frag (v2f i) : SV_Target
         float3 indirectSpecular = getIndirectSpecular(i.worldPos, diffuseColor, vdn, metallicSmoothness, reflViewDir, indirectDiffuse, viewDir, directDiffuse);
         float3 directSpecular = getDirectSpecular(lightCol, diffuseColor, metallicSmoothness, rdv, attenuation);
 
+        directDiffuse *= lerp(1, occlusionMap, _OcclusionStrength);
+        directSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
+        indirectSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
 
         lighting = diffuse * (directDiffuse + indirectDiffuse); 
         lighting += directSpecular; 
@@ -103,6 +110,7 @@ fixed4 frag (v2f i) : SV_Target
         #if defined(alphablend)
             al = diffuseColor.a;
         #endif
+        UNITY_APPLY_FOG(i.fogCoord, lighting);
         return float4(lighting, al);
     #endif
 }
