@@ -133,6 +133,6 @@ fixed4 frag (v2f i) : SV_Target
         #endif
 
         UNITY_APPLY_FOG(i.fogCoord, lighting);
-        return float4(diffuse.xyz, al);
+        return float4(lighting, al);
     #endif
 }
