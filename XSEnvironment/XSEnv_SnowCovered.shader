@@ -1,4 +1,4 @@
-Shader "Xiexe/Environment/Opaque"
+Shader "Xiexe/Environment/Opaque_SnowCovered"
 {
 	Properties
 	{
@@ -33,6 +33,12 @@ Shader "Xiexe/Environment/Opaque"
         [HDR]_EmissionColor("Emission Color", Color) = (0,0,0,1)
 
         [Space(16)]
+        [Header(SNOW COVERAGE)]
+        _SnowNoise("Noise", 2D) = "white" {}
+        _SnowCoverage("Snow Coverage", range(0,1)) = 1
+        _InvertSnowCoverage("Invert Snow Coverage", Range(0,1)) = 0
+
+        [Space(16)]
         [Header(LIGHTMAPPING HACKS)]
         _SpecularLMOcclusion("Specular Occlusion", Range(0,1)) = 0
         _SpecLMOcclusionAdjust("Spec Occlusion Sensitiviy", Range(0,1)) = 0.2
@@ -57,6 +63,8 @@ Shader "Xiexe/Environment/Opaque"
             #ifndef UNITY_PASS_FORWARDBASE
                 #define UNITY_PASS_FORWARDBASE
             #endif
+
+            #define SnowCoverage
 			
 			#include "UnityCG.cginc"
             #include "Lighting.cginc"
@@ -109,6 +117,8 @@ Shader "Xiexe/Environment/Opaque"
                 #define UNITY_PASS_FORWARDADD
             #endif
 
+            #define SnowCoverage
+
 			#include "UnityCG.cginc"
             #include "Lighting.cginc"
             #include "AutoLight.cginc"
@@ -129,7 +139,7 @@ Shader "Xiexe/Environment/Opaque"
                 float3 worldPos : TEXCOORD4;
                 float3 objPos : TEXCOORD5;
                 float3 objNormal : TEXCOORD6;
-                UNITY_SHADOW_COORDS(7)
+                SHADOW_COORDS(7)
                 UNITY_FOG_COORDS(8)
 			};
 

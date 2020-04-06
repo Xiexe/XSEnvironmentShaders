@@ -1,4 +1,4 @@
-Shader "Xiexe/Environment/Opaque"
+Shader "Xiexe/Environment/Cutout_SnowCovered"
 {
 	Properties
 	{
@@ -10,6 +10,7 @@ Shader "Xiexe/Environment/Opaque"
         [Header(MAIN)]
         _MainTex ("Main Texture", 2D) = "white" {}
         _Color ("Color", Color) = (1,1,1,1)
+        _Cutoff("Cutoff", Range(0,1)) = 0.5
 
         [Space(16)]
         [Header(NORMALS)]
@@ -33,6 +34,12 @@ Shader "Xiexe/Environment/Opaque"
         [HDR]_EmissionColor("Emission Color", Color) = (0,0,0,1)
 
         [Space(16)]
+        [Header(SNOW COVERAGE)]
+        _SnowNoise("Noise", 2D) = "white" {}
+        _SnowCoverage("Snow Coverage", range(0,1)) = 1 
+        _InvertSnowCoverage("Invert Snow Coverage", Range(0,1)) = 0
+
+        [Space(16)]
         [Header(LIGHTMAPPING HACKS)]
         _SpecularLMOcclusion("Specular Occlusion", Range(0,1)) = 0
         _SpecLMOcclusionAdjust("Spec Occlusion Sensitiviy", Range(0,1)) = 0.2
@@ -43,7 +50,7 @@ Shader "Xiexe/Environment/Opaque"
     }
 	SubShader
 	{
-		Tags { "Queue"="Geometry" }
+		Tags { "Queue"="AlphaTest" }
 
 		Pass
 		{
@@ -53,6 +60,8 @@ Shader "Xiexe/Environment/Opaque"
 			#pragma fragment frag
             #pragma multi_compile_fwdbase 
             #pragma multi_compile_fog
+            #define alphaToMask
+            #define SnowCoverage
 
             #ifndef UNITY_PASS_FORWARDBASE
                 #define UNITY_PASS_FORWARDBASE
@@ -104,6 +113,8 @@ Shader "Xiexe/Environment/Opaque"
 			#pragma fragment frag
             #pragma multi_compile_fwdadd_fullshadows
             #pragma multi_compile_fog
+            #define alphaToMask
+            #define SnowCoverage
             
             #ifndef UNITY_PASS_FORWARDADD
                 #define UNITY_PASS_FORWARDADD
@@ -129,7 +140,7 @@ Shader "Xiexe/Environment/Opaque"
                 float3 worldPos : TEXCOORD4;
                 float3 objPos : TEXCOORD5;
                 float3 objNormal : TEXCOORD6;
-                UNITY_SHADOW_COORDS(7)
+                SHADOW_COORDS(7)
                 UNITY_FOG_COORDS(8)
 			};
 
@@ -151,6 +162,7 @@ Shader "Xiexe/Environment/Opaque"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_shadowcaster
+            #define alphaToMask
             
             #ifndef UNITY_PASS_SHADOWCASTER
                 #define UNITY_PASS_SHADOWCASTER

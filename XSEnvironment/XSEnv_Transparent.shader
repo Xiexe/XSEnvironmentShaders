@@ -2,16 +2,19 @@ Shader "Xiexe/Environment/Transparent"
 {
 	Properties
 	{
-        [Header(MAIN)]
+        [Header(TRIPLANAR SETTINGS)]
         [Enum(UVs, 0, Triplanar World, 1, Triplanar Object, 2)]_TextureSampleMode("Texture Mode", Int) = 0
-		_TriplanarFalloff("Triplanar Blend", Range(0.5,1)) = 1
+		_TriplanarFalloff("Triplanar Blend", Range(0,1)) = 1
+        // _RotationAxes("Triplanar Rotation", Vector) = (0,0,0,0)
+
+        [Header(MAIN)]
         _MainTex ("Main Texture", 2D) = "white" {}
         _Color ("Color", Color) = (1,1,1,1)
 
         [Space(16)]
         [Header(NORMALS)]
         _BumpMap("Normal Map", 2D) = "bump" {}
-        _BumpScale("Normal Scale", Range(-1,1)) = 1
+        _BumpScale("Normal Scale", Float) = 1
         
         [Space(16)]
         [Header(METALLIC)]

@@ -8,7 +8,7 @@ v2f vert (appdata v)
     float3 bitangent = cross(tangent, worldNormal);
 
     o.pos = UnityObjectToClipPos(v.vertex);
-    o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+    o.uv = v.uv;
     
     #if !defined(UNITY_PASS_SHADOWCASTER)
         #if !defined(UNITY_PASS_FORWARDADD)
@@ -25,7 +25,7 @@ v2f vert (appdata v)
         UNITY_TRANSFER_SHADOW(o, o.uv);
         UNITY_TRANSFER_FOG(o,o.pos);
     #else
-    TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
+        TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
     #endif
 
     return o;
@@ -35,6 +35,10 @@ fixed4 frag (v2f i) : SV_Target
 {
     //Return only this if in the shadowcaster
     #if defined(UNITY_PASS_SHADOWCASTER)
+        #if defined(alphaToMask)
+           float4 albedo = tex2D(_MainTex, i.uv) * _Color;
+           clip(albedo.a - _Cutoff);
+        #endif
         SHADOW_CASTER_FRAGMENT(i);
     #elif defined(UNITY_PASS_META)
         UnityMetaInput o;
@@ -97,9 +101,22 @@ fixed4 frag (v2f i) : SV_Target
         float3 indirectSpecular = getIndirectSpecular(i.worldPos, diffuseColor, vdn, metallicSmoothness, reflViewDir, indirectDiffuse, viewDir, directDiffuse);
         float3 directSpecular = getDirectSpecular(lightCol, diffuseColor, metallicSmoothness, rdv, attenuation);
 
+        #if defined(SnowCoverage)
+            float dist = distance(_WorldSpaceCameraPos, i.worldPos);
+            float snowMask = getSnowMask(worldNormal);
+            float snowSparkles = getSnowSparkles(vdn, rdv, dist, i.uv, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff);
+            float snowShine = getSnowShine(vdn, rdv);
+
+            float snow = (snowSparkles * snowMask * 10);
+            diffuse = lerp(diffuse, snowMask + (snowShine * 0.5), snowMask);
+            directSpecular += snow;
+
+        #endif
+
         directDiffuse *= lerp(1, occlusionMap, _OcclusionStrength);
         directSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
         indirectSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
+
 
         lighting = diffuse * (directDiffuse + indirectDiffuse); 
         lighting += directSpecular; 
@@ -107,10 +124,15 @@ fixed4 frag (v2f i) : SV_Target
         lighting += emission;
         
         float al = 1;
-        #if defined(alphablend)
+        #if defined(alphablend) 
             al = diffuseColor.a;
         #endif
+
+        #if defined(alphaToMask)
+            clip(diffuseColor.a - _Cutoff);
+        #endif
+
         UNITY_APPLY_FOG(i.fogCoord, lighting);
-        return float4(lighting, al);
+        return float4(diffuse.xyz, al);
     #endif
 }
