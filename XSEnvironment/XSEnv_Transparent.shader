@@ -3,6 +3,7 @@ Shader "Xiexe/Environment/Transparent"
 	Properties
 	{
         [Header(TRIPLANAR SETTINGS)]
+        [Enum(Off,0,Front,1,Back,2)] _Culling ("Culling Mode", Int) = 2
         [Enum(UVs, 0, Triplanar World, 1, Triplanar Object, 2)]_TextureSampleMode("Texture Mode", Int) = 0
 		_TriplanarFalloff("Triplanar Blend", Range(0,1)) = 1
         // _RotationAxes("Triplanar Rotation", Vector) = (0,0,0,0)
@@ -25,7 +26,7 @@ Shader "Xiexe/Environment/Transparent"
         [Space(16)]
         [Header(OCCLUSION)]
         _OcclusionMap("Occlusion Map", 2D) = "white" {}
-        _OcclusionStrength("Occlusion Strength", Float) = 1
+        _OcclusionStrength("Occlusion Strength", Range(0,1)) = 1
 
         [Space(16)]
         [Header(EMISSION)]
@@ -39,6 +40,8 @@ Shader "Xiexe/Environment/Transparent"
 
         _LMStrength("Lightmap Strength", Range(0,1)) = 1
         _RTLMStrength("Realtime Lightmap Strength", Range(0,1)) = 1
+        [Toggle(_)]_CastShadowsToLightmap("Cast Lightmap Shadows", Int) = 1
+        [Toggle(_)]_DebugLightmapView("Debug Lightmap View Only", Int) = 0
 
     }
 	SubShader
@@ -48,6 +51,7 @@ Shader "Xiexe/Environment/Transparent"
 		Pass
 		{
             Tags {"LightMode"="ForwardBase"}
+            Cull [_Culling]
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -99,7 +103,7 @@ Shader "Xiexe/Environment/Transparent"
             Tags {"LightMode"="ForwardAdd"}
             Blend One One
             ZWrite Off
-            
+            Cull [_Culling]
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
@@ -181,7 +185,7 @@ Shader "Xiexe/Environment/Transparent"
         {
             Name "META"
             Tags {"LightMode"="Meta"}
-            Cull Off
+            Cull [_Culling]
             CGPROGRAM
   
             #ifndef UNITY_PASS_META

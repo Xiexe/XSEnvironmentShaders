@@ -48,13 +48,13 @@ half4 getMetallicSmoothness(float4 metallicGlossMap, float3 worldNormal)
 //Reflection direction, worldPos, unity_SpecCube0_ProbePosition, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax
 float3 getReflectionUV(float3 direction, float3 position, float4 cubemapPosition, float3 boxMin, float3 boxMax) 
 {
-	#if UNITY_SPECCUBE_BOX_PROJECTION
+	//#if UNITY_SPECCUBE_BOX_PROJECTION
 		if (cubemapPosition.w > 0) {
 			float3 factors = ((direction > 0 ? boxMax : boxMin) - position) / direction;
 			float scalar = min(min(factors.x, factors.y), factors.z);
 			direction = direction * scalar + (position - cubemapPosition);
 		}
-	#endif
+	//#endif
 	return direction;
 }
 

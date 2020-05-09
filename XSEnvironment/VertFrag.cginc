@@ -22,10 +22,12 @@ v2f vert (appdata v)
         o.worldPos = mul(unity_ObjectToWorld, v.vertex);
         o.objPos = v.vertex;
         o.objNormal = v.normal;
+        
         UNITY_TRANSFER_SHADOW(o, o.uv);
         UNITY_TRANSFER_FOG(o,o.pos);
     #else
-        TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
+        if(_CastShadowsToLightmap ==1)
+            TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
     #endif
 
     return o;
@@ -35,15 +37,25 @@ fixed4 frag (v2f i) : SV_Target
 {
     //Return only this if in the shadowcaster
     #if defined(UNITY_PASS_SHADOWCASTER)
-        #if defined(alphaToMask)
-           float4 albedo = tex2D(_MainTex, i.uv) * _Color;
-           clip(albedo.a - _Cutoff);
-        #endif
-        SHADOW_CASTER_FRAGMENT(i);
+        if(_CastShadowsToLightmap == 1)
+        {
+            #if defined(alphaToMask)
+            float4 albedo = tex2D(_MainTex, i.uv) * _Color;
+            clip(albedo.a - _Cutoff);
+            #endif
+            SHADOW_CASTER_FRAGMENT(i);
+        }
+        else
+        {
+            float4 albedo = tex2D(_MainTex, i.uv) * _Color;
+            albedo.a = 0;
+            SHADOW_CASTER_FRAGMENT(i);
+        }
     #elif defined(UNITY_PASS_META)
         UnityMetaInput o;
         UNITY_INITIALIZE_OUTPUT(UnityMetaInput, o);
         o.Albedo = texTP(_MainTex, _MainTex_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv) * _Color;
+        o.Albedo.a = 0;
         o.Emission = texTP(_EmissionMap, _EmissionMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv) * _EmissionColor;
         return UnityMetaFragment(o);
     #else
@@ -113,16 +125,12 @@ fixed4 frag (v2f i) : SV_Target
 
         #endif
 
-        directDiffuse *= lerp(1, occlusionMap, _OcclusionStrength);
-        directSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
-        indirectSpecular *= lerp(1, occlusionMap, _OcclusionStrength);
-
-
-        lighting = diffuse * (directDiffuse + indirectDiffuse); 
+        lighting = lerp(diffuse, float3(1,1,1), _DebugLightmapView) * (directDiffuse + indirectDiffuse); 
         lighting += directSpecular; 
         lighting += indirectSpecular;
+        lighting *= lerp(1,occlusionMap,saturate(_OcclusionStrength));
         lighting += emission;
-        
+
         float al = 1;
         #if defined(alphablend) 
             al = diffuseColor.a;
