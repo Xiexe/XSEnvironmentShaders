@@ -26,8 +26,7 @@ v2f vert (appdata v)
         UNITY_TRANSFER_SHADOW(o, o.uv);
         UNITY_TRANSFER_FOG(o,o.pos);
     #else
-        if(_CastShadowsToLightmap ==1)
-            TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
+        TRANSFER_SHADOW_CASTER_NOPOS(o, o.pos);
     #endif
 
     return o;
@@ -39,18 +38,17 @@ fixed4 frag (v2f i) : SV_Target
     #if defined(UNITY_PASS_SHADOWCASTER)
         if(_CastShadowsToLightmap == 1)
         {
-            #if defined(alphaToMask)
-            float4 albedo = tex2D(_MainTex, i.uv) * _Color;
-            clip(albedo.a - _Cutoff);
+            #if defined(alphaToMask) 
+                float4 albedo = tex2D(_MainTex, i.uv) * _Color;
+                clip(albedo.a - _Cutoff);
             #endif
-            SHADOW_CASTER_FRAGMENT(i);
+
+            #if defined(alphablend)
+                float4 albedo = tex2D(_MainTex, i.uv) * _Color;
+            #endif
         }
-        else
-        {
-            float4 albedo = tex2D(_MainTex, i.uv) * _Color;
-            albedo.a = 0;
-            SHADOW_CASTER_FRAGMENT(i);
-        }
+        SHADOW_CASTER_FRAGMENT(i);
+        
     #elif defined(UNITY_PASS_META)
         UnityMetaInput o;
         UNITY_INITIALIZE_OUTPUT(UnityMetaInput, o);
@@ -79,6 +77,9 @@ fixed4 frag (v2f i) : SV_Target
         //OCCLUSION
         float4 occlusionMap = texTP(_OcclusionMap, _OcclusionMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv);
 
+        //THICKNESS
+        float4 thicknessMap = texTP(_ThicknessMap, _ThicknessMap_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv);
+
         //DIFFUSE
         fixed4 diffuse = texTP(_MainTex, _MainTex_ST, i.worldPos, i.objPos, i.btn[2], i.objNormal, _TriplanarFalloff, i.uv) * _Color;
         fixed4 diffuseColor = diffuse; //Store for later use, we alter it after.
@@ -97,19 +98,35 @@ fixed4 frag (v2f i) : SV_Target
 
         //LIGHTING
         float3 lighting = float3(0,0,0);
-        
+        float3 indirectDiffuse = float3(0,0,0);
+        float3 directDiffuse = float3(0,0,0);
         #if defined(LIGHTMAP_ON)
-            float3 indirectDiffuse = 0;
-            float3 directDiffuse = getLightmap(i.uv1, worldNormal, i.worldPos);
+            indirectDiffuse = 0;
+            directDiffuse = getLightmap(i.uv1, worldNormal, i.worldPos);
             #if defined(DYNAMICLIGHTMAP_ON)
                 float3 realtimeLM = getRealtimeLightmap(i.uv2, worldNormal);
                 directDiffuse += realtimeLM;
             #endif
         #else
-            float3 indirectDiffuse = ShadeSH9(float4(worldNormal, 1));
-            float3 directDiffuse = ndl * attenuation * _LightColor0;
+            #if defined(UNITY_PASS_FORWARDBASE)
+                if(_LightProbeMethod == 0)
+                {
+                    indirectDiffuse = ShadeSH9(float4(worldNormal, 1));
+                }
+                else
+                {
+                    float3 L0 = float3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w);
+                    indirectDiffuse.r = shEvaluateDiffuseL1Geomerics(L0.r, unity_SHAr.xyz, worldNormal);
+                    indirectDiffuse.g = shEvaluateDiffuseL1Geomerics(L0.g, unity_SHAg.xyz, worldNormal);
+                    indirectDiffuse.b = shEvaluateDiffuseL1Geomerics(L0.b, unity_SHAb.xyz, worldNormal);
+                }
+            #endif
+            directDiffuse = ndl * attenuation * _LightColor0;
         #endif
-        
+
+        float transmissionMask = 0;
+        float3 transmission = calcSubsurfaceScattering(attenuation, ndl, diffuseColor.rgb, thicknessMap.x, lightDir, viewDir, i.btn[2], lightCol, indirectDiffuse, transmissionMask);
+
         float3 indirectSpecular = getIndirectSpecular(i.worldPos, diffuseColor, vdn, metallicSmoothness, reflViewDir, indirectDiffuse, viewDir, directDiffuse);
         float3 directSpecular = getDirectSpecular(lightCol, diffuseColor, metallicSmoothness, rdv, attenuation);
 
@@ -122,13 +139,13 @@ fixed4 frag (v2f i) : SV_Target
             float snow = (snowSparkles * snowMask * 10);
             diffuse = lerp(diffuse, snowMask + (snowShine * 0.5), snowMask);
             directSpecular += snow;
-
         #endif
 
         lighting = lerp(diffuse, float3(1,1,1), _DebugLightmapView) * (directDiffuse + indirectDiffuse); 
         lighting += directSpecular; 
         lighting += indirectSpecular;
-        lighting *= lerp(1,occlusionMap,saturate(_OcclusionStrength));
+        lighting *= lerp(1, occlusionMap, saturate(_OcclusionStrength));
+        lighting += transmission; 
         lighting += emission;
 
         float al = 1;

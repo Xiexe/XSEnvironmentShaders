@@ -1,4 +1,4 @@
-Shader "Xiexe/Environment/Transparent"
+Shader "Xiexe/Environment/Fade"
 {
 	Properties
 	{
@@ -51,19 +51,17 @@ Shader "Xiexe/Environment/Transparent"
         _RTLMStrength("Realtime Lightmap Strength", Range(0,1)) = 1
         [Toggle(_)]_CastShadowsToLightmap("Cast Lightmap Shadows", Int) = 1
         [Toggle(_)]_DebugLightmapView("Debug Lightmap View Only", Int) = 0
-
     }
 	SubShader
 	{
 		Tags { "Queue"="Transparent" "RenderType"="Transparent"}
-        
+
 		Pass
 		{
             Tags {"LightMode"="ForwardBase"}
-            Blend One OneMinusSrcAlpha
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull [_Culling]
-            ZWrite Off
-        	CGPROGRAM
+			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
             #pragma multi_compile_fwdbase

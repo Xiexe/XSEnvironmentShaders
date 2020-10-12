@@ -270,6 +270,67 @@ float3 texTPNorm( sampler2D tex, float4 tillingOffset, float3 worldPos, float3 o
     }
 }
 
+//L1 light probe sampling - from Bakery Standard
+float shEvaluateDiffuseL1Geomerics(float L0, float3 L1, float3 n)
+{
+    // average energy
+    float R0 = L0;
+
+    // avg direction of incoming light
+    float3 R1 = 0.5f * L1;
+
+    // directional brightness
+    float lenR1 = length(R1);
+
+    // linear angle between normal and direction 0-1
+    //float q = 0.5f * (1.0f + dot(R1 / lenR1, n));
+    //float q = dot(R1 / lenR1, n) * 0.5 + 0.5;
+    float q = dot(normalize(R1), n) * 0.5 + 0.5;
+
+    // power for q
+    // lerps from 1 (linear) to 3 (cubic) based on directionality
+    float p = 1.0f + 2.0f * lenR1 / R0;
+
+    // dynamic range constant
+    // should vary between 4 (highly directional) and 0 (ambient)
+    float a = (1.0f - lenR1 / R0) / (1.0f + lenR1 / R0);
+
+    return R0 * (a + (1.0f - a) * (p + 1.0f) * pow(q, p));
+}
+
+//Subsurface Scattering - Based on a 2011 GDC Conference from by Colin Barre-Bresebois & Marc Bouchard
+//Modified by Xiexe
+half4 calcSubsurfaceScattering(float attenuation, float ndl, float3 albedo, float thickness, half3 lightDir, half3 viewDir, half3 normal, half4 lightCol, half3 indirectDiffuse, inout float transmissionMask)
+{
+    UNITY_BRANCH
+    if(any(_SSColor.rgb)) // Skip all the SSS stuff if the color is 0.
+    {
+        //d.ndl = smoothstep(_SSSRange - _SSSSharpness, _SSSRange + _SSSSharpness, d.ndl);
+        half atten = saturate(attenuation * (ndl * 0.5 + 0.5));
+        half3 H = normalize(lightDir + normal * _SSDistortion);
+        half VdotH = pow(saturate(dot(viewDir, -H)), _SSPower);
+        transmissionMask = (VdotH + indirectDiffuse) * atten * thickness * _SSScale;
+        half3 I = _SSColor * transmissionMask;
+
+        if(!any(lightCol.rgb))
+            lightCol.rgb = indirectDiffuse;
+
+        half4 SSS = half4(lightCol.rgb * I * albedo, 1);
+        SSS = max(0, SSS); // Make sure it doesn't go NaN
+
+        return SSS;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+half3 calcFakeTransmission_Or_SS(float3 objPos)
+{
+    return ShadeSH9(float4(objPos, 1));
+}
+
 #if defined(SnowCoverage)
 float getSnowMask(float3 worldNormal)
 {

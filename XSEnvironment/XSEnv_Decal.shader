@@ -1,4 +1,4 @@
-Shader "Xiexe/Environment/Transparent"
+Shader "Xiexe/Environment/Fade_Decal"
 {
 	Properties
 	{
@@ -52,18 +52,23 @@ Shader "Xiexe/Environment/Transparent"
         [Toggle(_)]_CastShadowsToLightmap("Cast Lightmap Shadows", Int) = 1
         [Toggle(_)]_DebugLightmapView("Debug Lightmap View Only", Int) = 0
 
+        [Space(16)]
+        [Header(DECAL)]
+        _OffsetFactor("Offset Factor", Range(-1, 1)) = 0
+        _OffsetUnit("Offset Unit", Range(-10,10)) = 0
+
     }
 	SubShader
 	{
 		Tags { "Queue"="Transparent" "RenderType"="Transparent"}
+        Offset -1, 0
         
 		Pass
 		{
             Tags {"LightMode"="ForwardBase"}
-            Blend One OneMinusSrcAlpha
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull [_Culling]
-            ZWrite Off
-        	CGPROGRAM
+			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
             #pragma multi_compile_fwdbase
