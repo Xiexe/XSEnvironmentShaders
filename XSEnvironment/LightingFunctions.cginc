@@ -1,7 +1,6 @@
 ﻿//This file contains all of the neccisary functions for lighting to work a'la standard shading.
 //Feel free to add to this.
 
-
 // Rotation with angle (in radians) and axis
 float3x3 AngleAxis3x3(float angle, float3 axis)
 {
@@ -32,17 +31,18 @@ float2 rotateUV(float2 uv, float rotation)
 
 half4 getMetallicSmoothness(float4 metallicGlossMap, float3 worldNormal)
 {
-	half roughness = 1-(_Glossiness * metallicGlossMap.a);
+    half metallic = metallicGlossMap.r * _Metallic;
+
+    half smoothness = metallicGlossMap.a * _Glossiness;
+	half roughness = 1-smoothness;
 	roughness *= 1.7 - 0.7 * roughness;
-	half metallic = metallicGlossMap.r * _Metallic;
 
     //GeometricSpecularAA
-    // float3 vNormalWsDdx = ddx( worldNormal );
-    // float3 vNormalWsDdy = ddy( worldNormal );
-    // float flGeometricRoughnessFactor = (pow( saturate( max( dot( vNormalWsDdx, vNormalWsDdx ), dot( vNormalWsDdy, vNormalWsDdy ) ) ), 0.333 ));
-    // roughness = roughness * (1-flGeometricRoughnessFactor);
+    float3 vNormalWsDdx = ddx( worldNormal );
+    float3 vNormalWsDdy = ddy( worldNormal );
+    float flGeometricRoughnessFactor = (pow( saturate( max( dot( vNormalWsDdx, vNormalWsDdx ), dot( vNormalWsDdy, vNormalWsDdy ) ) ), 0.333 ));
 
-	return half4(metallic, 0, 0, roughness);
+	return half4(metallic, 0, 0, (1-roughness) * (1-flGeometricRoughnessFactor));
 }
 
 //Reflection direction, worldPos, unity_SpecCube0_ProbePosition, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax
@@ -58,12 +58,23 @@ float3 getReflectionUV(float3 direction, float3 position, float4 cubemapPosition
 	return direction;
 }
 
-half3 getIndirectSpecular(float3 worldPos, float3 diffuseColor, float vdn, float4 metallicSmoothness, half3 reflDir, half3 indirectLight, float3 viewDir, float3 lighting)
+float DirectionalLMSpecular(float2 lmUV, float3 normalWorld, float3 viewDir, float smoothness)
+{
+    float3 dominantDir = UNITY_SAMPLE_TEX2D_SAMPLER(unity_LightmapInd, unity_Lightmap, lmUV).xyz * 2 - 1;
+    half3 halfDir = Unity_SafeNormalize(normalize(dominantDir) - viewDir);
+    half nh = saturate(dot(normalWorld, halfDir));
+    half perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
+    half roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+    half spec = GGXTerm(nh, roughness);
+    return spec;
+}
+
+half3 getIndirectSpecular(float3 worldPos, float3 diffuseColor, float vdn, float4 metallicSmoothness, half3 reflDir, half3 indirectLight, float3 viewDir, float3 lighting, float lmUV, float3 worldNormal)
 {	//This function handls Unity style reflections, Matcaps, and a baked in fallback cubemap.
 	half3 spec = half3(0,0,0);
     #if defined(UNITY_PASS_FORWARDBASE)
         float3 reflectionUV1 = getReflectionUV(reflDir, worldPos, unity_SpecCube0_ProbePosition, unity_SpecCube0_BoxMin, unity_SpecCube0_BoxMax);
-        half4 probe0 = UNITY_SAMPLE_TEXCUBE_LOD(unity_SpecCube0, reflectionUV1, metallicSmoothness.w * 6);
+        half4 probe0 = UNITY_SAMPLE_TEXCUBE_LOD(unity_SpecCube0, reflectionUV1, (1-metallicSmoothness.w) * 6);
         half3 probe0sample = DecodeHDR(probe0, unity_SpecCube0_HDR);
 
         float3 indirectSpecular;
@@ -73,7 +84,7 @@ half3 getIndirectSpecular(float3 worldPos, float3 diffuseColor, float vdn, float
         if (interpolator < 0.99999) 
         {
             float3 reflectionUV2 = getReflectionUV(reflDir, worldPos, unity_SpecCube1_ProbePosition, unity_SpecCube1_BoxMin, unity_SpecCube1_BoxMax);
-            half4 probe1 = UNITY_SAMPLE_TEXCUBE_SAMPLER_LOD(unity_SpecCube1, unity_SpecCube0, reflectionUV2, metallicSmoothness.w * 6);
+            half4 probe1 = UNITY_SAMPLE_TEXCUBE_SAMPLER_LOD(unity_SpecCube1, unity_SpecCube0, reflectionUV2, (1-metallicSmoothness.w) * 6);
             half3 probe1sample = DecodeHDR(probe1, unity_SpecCube1_HDR);
             indirectSpecular = lerp(probe1sample, probe0sample, interpolator);
         }
@@ -84,10 +95,11 @@ half3 getIndirectSpecular(float3 worldPos, float3 diffuseColor, float vdn, float
 
         half3 metallicColor = indirectSpecular * lerp(0.05,diffuseColor.rgb, metallicSmoothness.x);
         spec = lerp(indirectSpecular, metallicColor, pow(vdn, 0.05));
-		spec = lerp(spec, spec * lighting, metallicSmoothness.w); // should only not see shadows on a perfect mirror.
+		spec = lerp(spec, spec * lighting, 1-metallicSmoothness.w); // should only not see shadows on a perfect mirror.
         
         #if defined(LIGHTMAP_ON)
             float specMultiplier = max(0, lerp(1, pow(length(lighting), _SpecLMOcclusionAdjust), _SpecularLMOcclusion));
+            // spec += ;
             spec *= specMultiplier;
         #endif
     #endif
@@ -136,9 +148,8 @@ half3 getRealtimeLightmap(float2 uv, float3 worldNormal)
     return realtimeLightmap * _RTLMStrength;
 }
 
-half3 getLightmap(float2 uv, float3 worldNormal, float3 worldPos)
+half3 getLightmaps(float2 lightmapUV, float3 worldNormal)
 {
-    float2 lightmapUV = uv * unity_LightmapST.xy + unity_LightmapST.zw;
     half4 bakedColorTex = UNITY_SAMPLE_TEX2D(unity_Lightmap, lightmapUV);
     half3 lightMap = DecodeLightmap(bakedColorTex);
     
@@ -268,6 +279,67 @@ float3 texTPNorm( sampler2D tex, float4 tillingOffset, float3 worldPos, float3 o
     else{
         return UnpackNormal(tex2D(tex, uv * tillingOffset.xy + tillingOffset.zw));
     }
+}
+
+//L1 light probe sampling - from Bakery Standard
+float shEvaluateDiffuseL1Geomerics(float L0, float3 L1, float3 n)
+{
+    // average energy
+    float R0 = L0;
+
+    // avg direction of incoming light
+    float3 R1 = 0.5f * L1;
+
+    // directional brightness
+    float lenR1 = length(R1);
+
+    // linear angle between normal and direction 0-1
+    //float q = 0.5f * (1.0f + dot(R1 / lenR1, n));
+    //float q = dot(R1 / lenR1, n) * 0.5 + 0.5;
+    float q = dot(normalize(R1), n) * 0.5 + 0.5;
+
+    // power for q
+    // lerps from 1 (linear) to 3 (cubic) based on directionality
+    float p = 1.0f + 2.0f * lenR1 / R0;
+
+    // dynamic range constant
+    // should vary between 4 (highly directional) and 0 (ambient)
+    float a = (1.0f - lenR1 / R0) / (1.0f + lenR1 / R0);
+
+    return R0 * (a + (1.0f - a) * (p + 1.0f) * pow(q, p));
+}
+
+//Subsurface Scattering - Based on a 2011 GDC Conference from by Colin Barre-Bresebois & Marc Bouchard
+//Modified by Xiexe
+half4 calcSubsurfaceScattering(float attenuation, float ndl, float3 albedo, float thickness, half3 lightDir, half3 viewDir, half3 normal, half4 lightCol, half3 indirectDiffuse, inout float transmissionMask)
+{
+    UNITY_BRANCH
+    if(any(_SSColor.rgb)) // Skip all the SSS stuff if the color is 0.
+    {
+        //d.ndl = smoothstep(_SSSRange - _SSSSharpness, _SSSRange + _SSSSharpness, d.ndl);
+        half atten = saturate(attenuation * (ndl * 0.5 + 0.5));
+        half3 H = normalize(lightDir + normal * _SSDistortion);
+        half VdotH = pow(saturate(dot(viewDir, -H)), _SSPower);
+        transmissionMask = (VdotH + indirectDiffuse) * atten * thickness * _SSScale;
+        half3 I = _SSColor * transmissionMask;
+
+        if(!any(lightCol.rgb))
+            lightCol.rgb = indirectDiffuse;
+
+        half4 SSS = half4(lightCol.rgb * I * albedo, 1);
+        SSS = max(0, SSS); // Make sure it doesn't go NaN
+
+        return SSS;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+half3 calcFakeTransmission_Or_SS(float3 objPos)
+{
+    return ShadeSH9(float4(objPos, 1));
 }
 
 #if defined(SnowCoverage)

@@ -5,6 +5,7 @@ Shader "Xiexe/Environment/Cutout_SnowCovered"
         [Header(TRIPLANAR SETTINGS)]
         [Enum(Off,0,Front,1,Back,2)] _Culling ("Culling Mode", Int) = 2
         [Enum(UVs, 0, Triplanar World, 1, Triplanar Object, 2)]_TextureSampleMode("Texture Mode", Int) = 0
+        [Enum(Unity Default, 0, Non Linear SH, 1)]_LightProbeMethod("Light Probe Sampling", Int) = 0
 		_TriplanarFalloff("Triplanar Blend", Range(0,1)) = 1
         // _RotationAxes("Triplanar Rotation", Vector) = (0,0,0,0)
 
@@ -35,6 +36,14 @@ Shader "Xiexe/Environment/Cutout_SnowCovered"
         [HDR]_EmissionColor("Emission Color", Color) = (0,0,0,1)
 
         [Space(16)]
+        [Header(TRANSMISSION)]
+        _ThicknessMap("Thickness Map", 2D) = "white" {}
+        [HDR]_SSColor ("Transmission Color", Color) = (0,0,0,0)
+        _SSDistortion("Normal Distortion", Range(0,3)) = 1
+        _SSPower("Transmission Power", Range(0,3)) = 1
+        _SSScale("Transmission Scale", Range(0,3)) = 1
+
+        [Space(16)]
         [Header(SNOW COVERAGE)]
         _SnowNoise("Noise", 2D) = "white" {}
         _SnowCoverage("Snow Coverage", range(0,1)) = 1 
@@ -44,7 +53,7 @@ Shader "Xiexe/Environment/Cutout_SnowCovered"
         [Header(LIGHTMAPPING HACKS)]
         _SpecularLMOcclusion("Specular Occlusion", Range(0,1)) = 0
         _SpecLMOcclusionAdjust("Spec Occlusion Sensitiviy", Range(0,1)) = 0.2
-
+        _LightMapSpecularStrength("LM Specular Scale", Range(0,1)) = 0.02
         _LMStrength("Lightmap Strength", Range(0,1)) = 1
         _RTLMStrength("Realtime Lightmap Strength", Range(0,1)) = 1
         [Toggle(_)]_CastShadowsToLightmap("Cast Lightmap Shadows", Int) = 1
@@ -53,7 +62,7 @@ Shader "Xiexe/Environment/Cutout_SnowCovered"
     }
 	SubShader
 	{
-		Tags { "Queue"="AlphaTest" }
+		Tags { "Queue"="AlphaTest" "RenderType"="TransparentCutout"}
 
 		Pass
 		{

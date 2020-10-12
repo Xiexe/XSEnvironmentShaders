@@ -1,4 +1,4 @@
-Shader "Xiexe/Environment/Opaque_SnowCovered"
+Shader "Xiexe/Environment/Fade"
 {
 	Properties
 	{
@@ -43,12 +43,6 @@ Shader "Xiexe/Environment/Opaque_SnowCovered"
         _SSScale("Transmission Scale", Range(0,3)) = 1
 
         [Space(16)]
-        [Header(SNOW COVERAGE)]
-        _SnowNoise("Noise", 2D) = "white" {}
-        _SnowCoverage("Snow Coverage", range(0,1)) = 1
-        _InvertSnowCoverage("Invert Snow Coverage", Range(0,1)) = 0
-
-        [Space(16)]
         [Header(LIGHTMAPPING HACKS)]
         _SpecularLMOcclusion("Specular Occlusion", Range(0,1)) = 0
         _SpecLMOcclusionAdjust("Spec Occlusion Sensitiviy", Range(0,1)) = 0.2
@@ -57,27 +51,26 @@ Shader "Xiexe/Environment/Opaque_SnowCovered"
         _RTLMStrength("Realtime Lightmap Strength", Range(0,1)) = 1
         [Toggle(_)]_CastShadowsToLightmap("Cast Lightmap Shadows", Int) = 1
         [Toggle(_)]_DebugLightmapView("Debug Lightmap View Only", Int) = 0
-
     }
 	SubShader
 	{
-		Tags { "Queue"="Geometry" }
+		Tags { "Queue"="Transparent" "RenderType"="Transparent"}
 
 		Pass
 		{
             Tags {"LightMode"="ForwardBase"}
+            Blend SrcAlpha OneMinusSrcAlpha
             Cull [_Culling]
 			CGPROGRAM
 			#pragma vertex vert
 			#pragma fragment frag
-            #pragma multi_compile_fwdbase 
+            #pragma multi_compile_fwdbase
             #pragma multi_compile_fog
+            #define alphablend
 
             #ifndef UNITY_PASS_FORWARDBASE
                 #define UNITY_PASS_FORWARDBASE
             #endif
-
-            #define SnowCoverage
 			
 			#include "UnityCG.cginc"
             #include "Lighting.cginc"
@@ -125,12 +118,10 @@ Shader "Xiexe/Environment/Opaque_SnowCovered"
 			#pragma fragment frag
             #pragma multi_compile_fwdadd_fullshadows
             #pragma multi_compile_fog
-            
+            #define alphablend
             #ifndef UNITY_PASS_FORWARDADD
                 #define UNITY_PASS_FORWARDADD
             #endif
-
-            #define SnowCoverage
 
 			#include "UnityCG.cginc"
             #include "Lighting.cginc"
@@ -167,6 +158,7 @@ Shader "Xiexe/Environment/Opaque_SnowCovered"
         {
             Tags{"LightMode" = "ShadowCaster"} //Removed "DisableBatching" = "True". If issues arise re-add this.
             Cull Off
+            
             CGPROGRAM
             #include "UnityCG.cginc" 
             #include "Lighting.cginc"
@@ -174,7 +166,7 @@ Shader "Xiexe/Environment/Opaque_SnowCovered"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_shadowcaster
-            
+            #define alphablend
             #ifndef UNITY_PASS_SHADOWCASTER
                 #define UNITY_PASS_SHADOWCASTER
             #endif
